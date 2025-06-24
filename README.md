@@ -98,4 +98,4 @@ Este proyecto está bajo la **Licencia MIT**. Esto significa que eres libre de u
 
 ---
 
-Creado con ❤️ por **(https://github.com/JSant-26)(https://github.com/eabarriostgc)**.
+Creado con ❤️ por **JSant-26,eabarriostgc**.
