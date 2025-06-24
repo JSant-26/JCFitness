@@ -1,873 +1,523 @@
+# --- START OF FILE app.py (VERSIÓN FINAL Y COMPLETA) ---
+
+import sys
 from PyQt6.QtWidgets import (
-    QApplication, QMainWindow, QTabWidget, QWidget,
-    QVBoxLayout, QHBoxLayout, QFormLayout, QLineEdit,
-    QPushButton, QListWidget, QListWidgetItem, QLabel,  # Añade QListWidgetItem aquí
-    QDateEdit, QComboBox, QMessageBox, QTableWidget, 
-    QTableWidgetItem, QHeaderView, QDialog, QDialogButtonBox, 
-    QGroupBox
+    QApplication, QMainWindow, QWidget, QHBoxLayout, 
+    QListWidget, QListWidgetItem, QStackedWidget, QMessageBox,
+    QDialog, QFormLayout, QLineEdit, QComboBox, QDialogButtonBox,
+    QTableWidgetItem, QHeaderView
 )
-from PyQt6.QtCore import QDate, Qt
+from PyQt6.QtCore import Qt, QDate
+from PyQt6.QtGui import QColor
 from datetime import datetime
 from database import Database
+# Importamos TODAS las páginas de la UI
+from interface import (
+    DashboardPage, MembersPage, AttendancePage, PaymentsPage,
+    MembershipsPage, EarningsPage, TrainersPage, ExpensesPage
+)
 
-# Configuración de accesibilidad
-LARGE_FONT = ("Arial", 14)
-LARGE_BUTTON_STYLE = """
-    QPushButton {
-        font-size: 16px;
-        padding: 15px;
-        min-width: 150px;
-        min-height: 50px;
+GLOBAL_STYLE = """
+    QMainWindow { background-color: #fdfdfd; }
+    QListWidget { 
+        border: none; outline: 0; background-color: #e8eff6; font-size: 16px;
     }
-"""
-LARGE_LABEL_STYLE = "QLabel { font-size: 16px; }"
-LARGE_LINEEDIT_STYLE = "QLineEdit { font-size: 16px; padding: 8px; }"
-LARGE_TABLE_STYLE = """
-    QTableWidget {
-        font-size: 14px;
+    QListWidget::item { 
+        padding: 15px 20px; border-bottom: 1px solid #dce5ee; color: #333;
     }
-    QHeaderView::section {
-        font-size: 14px;
-        padding: 8px;
+    QListWidget::item:hover { background-color: #d8e2ec; }
+    QListWidget::item:selected {
+        background: qlineargradient(x1: 0, y1: 0, x2: 0, y2: 1, stop: 0 #2a9dff, stop: 1 #007bff);
+        color: white; font-weight: bold; border-left: 5px solid #0056b3;
+        border-bottom-color: #0056b3;
     }
-"""
-LARGE_TAB_STYLE = """
-    QTabWidget::pane {
-        font-size: 16px;
-    }
-    QTabBar::tab {
-        font-size: 16px;
-        padding: 12px;
-    }
-"""
-LARGE_MESSAGEBOX_STYLE = """
-    QMessageBox {
-        font-size: 16px;
-    }
-    QMessageBox QLabel {
-        font-size: 16px;
-    }
-    QMessageBox QPushButton {
-        font-size: 16px;
-        padding: 10px;
-        min-width: 100px;
-    }
+    QMessageBox { font-size: 16px; }
+    QMessageBox QLabel { font-size: 16px; }
+    QMessageBox QPushButton { font-size: 16px; padding: 10px; min-width: 100px; }
 """
 
 class GymApp(QMainWindow):
     def __init__(self):
         super().__init__()
-        # Aplicar estilos de accesibilidad
-        self.setStyleSheet(
-            LARGE_LABEL_STYLE + 
-            LARGE_LINEEDIT_STYLE + 
-            LARGE_TABLE_STYLE +
-            LARGE_TAB_STYLE +
-            LARGE_MESSAGEBOX_STYLE
-        )
-        
         self.db = Database()
         self.setWindowTitle("JCFitness - Administración")
-        self.resize(1200, 800)
-        
-        self.tabs = QTabWidget()
-        self.setCentralWidget(self.tabs)
-        
-        self.tabs.addTab(self.create_members_tab(), "Miembros")
-        self.tabs.addTab(self.create_attendance_tab(), "Asistencias")
-        self.tabs.addTab(self.create_payments_tab(), "Pagos")
-        self.tabs.addTab(self.create_earnings_tab(), "Ganancias")  # Nueva pestaña
-        self.tabs.addTab(self.create_trainers_tab(), "Entrenadores")
-        self.tabs.addTab(self.create_expenses_tab(), "Gastos")
-        self.tabs.addTab(self.create_daily_expenses_tab(), "Gastos Del Día")
-    
-    def create_members_tab(self):
-        tab = QWidget()
-        layout = QVBoxLayout()
-        
-        # Formulario de registro
-        form = QFormLayout()
-        self.member_name = QLineEdit()
-        self.member_name.setStyleSheet(LARGE_LINEEDIT_STYLE)
-        self.member_lastname = QLineEdit()
-        self.member_lastname.setStyleSheet(LARGE_LINEEDIT_STYLE)
-        self.member_gender = QComboBox()
-        self.member_gender.addItems(["Masculino", "Femenino"])
-        self.member_gender.setStyleSheet(LARGE_LINEEDIT_STYLE)
-        
-        form.addRow(QLabel("Nombre:"), self.member_name)
-        form.addRow(QLabel("Apellido:"), self.member_lastname)
-        form.addRow(QLabel("Sexo:"), self.member_gender)
-        
-        btn_add = QPushButton("Registrar Miembro")
-        btn_add.setStyleSheet(LARGE_BUTTON_STYLE)
-        btn_add.clicked.connect(self.add_member)
-        
-        # Tabla de miembros
-        self.members_table = QTableWidget()
-        self.members_table.setColumnCount(5)
-        self.members_table.setHorizontalHeaderLabels(["ID", "Nombre", "Apellido", "Sexo", "Fecha Registro"])
-        self.members_table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
-        self.members_table.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
-        self.load_members()
-        
-        # Botones de acciones
-        btn_layout = QHBoxLayout()
-        btn_edit = QPushButton("Editar Miembro")
-        btn_edit.setStyleSheet(LARGE_BUTTON_STYLE)
-        btn_edit.clicked.connect(self.edit_member)
-        
-        btn_delete = QPushButton("Eliminar Miembro")
-        btn_delete.setStyleSheet(LARGE_BUTTON_STYLE)
-        btn_delete.clicked.connect(self.delete_member)
-        
-        btn_layout.addWidget(btn_edit)
-        btn_layout.addWidget(btn_delete)
-        
-        # Barra de búsqueda
-        self.member_search = QLineEdit()
-        self.member_search.setPlaceholderText("Buscar por nombre o apellido...")
-        self.member_search.setStyleSheet(LARGE_LINEEDIT_STYLE)
-        self.member_search.textChanged.connect(self.filter_members_table)
-        
-        layout.addLayout(form)
-        layout.addWidget(btn_add)
-        layout.addWidget(self.member_search)
-        layout.addWidget(self.members_table)
-        layout.addLayout(btn_layout)
-        tab.setLayout(layout)
-        return tab
-    
-    def create_attendance_tab(self):
-        tab = QWidget()
-        layout = QVBoxLayout()
-        
-        # Barra de búsqueda
-        self.search_attendance = QLineEdit()
-        self.search_attendance.setPlaceholderText("Buscar por nombre o apellido...")
-        self.search_attendance.setStyleSheet(LARGE_LINEEDIT_STYLE)
-        self.search_attendance.textChanged.connect(self.filter_members_for_attendance)
-        
-        # Lista de miembros
-        self.attendance_list = QListWidget()
-        self.attendance_list.setStyleSheet("font-size: 16px;")
-        self.load_members_for_attendance()
-        
-        # Botones de asistencia
-        btn_layout = QHBoxLayout()
-        btn_checkin = QPushButton("Registrar Entrada")
-        btn_checkin.setStyleSheet(LARGE_BUTTON_STYLE)
-        btn_checkin.clicked.connect(self.register_checkin)
-        
-        btn_checkout = QPushButton("Registrar Salida")
-        btn_checkout.setStyleSheet(LARGE_BUTTON_STYLE)
-        btn_checkout.clicked.connect(self.register_checkout)
-        
-        btn_layout.addWidget(btn_checkin)
-        btn_layout.addWidget(btn_checkout)
-        
-        layout.addWidget(self.search_attendance)
-        layout.addWidget(self.attendance_list)
-        layout.addLayout(btn_layout)
-        tab.setLayout(layout)
-        return tab
-    
-    def create_payments_tab(self):
-        """Pestaña simplificada solo para registrar pagos"""
-        tab = QWidget()
-        layout = QVBoxLayout()
-        
-        # Sección de registro
-        form = QFormLayout()
-        
-        # Búsqueda de miembros
-        self.payment_search = QLineEdit()
-        self.payment_search.setPlaceholderText("Buscar miembro...")
-        self.payment_search.setStyleSheet(LARGE_LINEEDIT_STYLE)
-        self.payment_search.textChanged.connect(self.filter_members_for_payments)
-        
-        self.payment_member_list = QListWidget()
-        self.payment_member_list.setStyleSheet("font-size: 16px;")
-        self.load_members_for_payments()
-        
-        self.payment_amount = QLineEdit()
-        self.payment_amount.setStyleSheet(LARGE_LINEEDIT_STYLE)
-        
-        form.addRow(QLabel("Buscar Miembro:"), self.payment_search)
-        form.addRow(self.payment_member_list)
-        form.addRow(QLabel("Monto:"), self.payment_amount)
-        
-        btn_pay = QPushButton("Registrar Pago")
-        btn_pay.setStyleSheet(LARGE_BUTTON_STYLE)
-        btn_pay.clicked.connect(self.register_payment)
-        
-        layout.addLayout(form)
-        layout.addWidget(btn_pay)
-        tab.setLayout(layout)
-        return tab
-    
-# En la función create_earnings_tab (ya existe pero hay que asegurarse que use los nombres correctos)
-    def create_earnings_tab(self):
-        """Crea la pestaña de Ganancias con subpestañas para mensual y diario"""
-        tab = QWidget()
-        layout = QVBoxLayout()
-        
-        # Crear el widget de pestañas
-        earnings_tabs = QTabWidget()
-        
-        # Pestaña de ganancias mensuales
-        monthly_tab = QWidget()
-        monthly_layout = QVBoxLayout()
-        
-        self.monthly_earnings_table = QTableWidget()  # Este es el nombre correcto que se usa
-        self.monthly_earnings_table.setColumnCount(3)
-        self.monthly_earnings_table.setHorizontalHeaderLabels(["Mes", "Total Ganancias", "N° Pagos"])
-        self.monthly_earnings_table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
-        self.load_monthly_earnings()
-        
-        monthly_layout.addWidget(QLabel("<b>Ganancias Mensuales</b>"))
-        monthly_layout.addWidget(self.monthly_earnings_table)
-        monthly_tab.setLayout(monthly_layout)
-        
-        # Pestaña de ganancias diarias
-        daily_tab = QWidget()
-        daily_layout = QVBoxLayout()
-        
-        self.daily_earnings_date = QDateEdit()  # Este es el nombre correcto que se usa
-        self.daily_earnings_date.setDate(QDate.currentDate())
-        self.daily_earnings_date.setCalendarPopup(True)
-        self.daily_earnings_date.setStyleSheet(LARGE_LINEEDIT_STYLE)
-        
-        btn_load_daily = QPushButton("Cargar Ganancias del Día")
-        btn_load_daily.setStyleSheet(LARGE_BUTTON_STYLE)
-        btn_load_daily.clicked.connect(self.load_daily_earnings)
-        
-        self.daily_earnings_table = QTableWidget()
-        self.daily_earnings_table.setColumnCount(4)
-        self.daily_earnings_table.setHorizontalHeaderLabels(["Hora", "Miembro", "Monto", "Tipo"])
-        self.daily_earnings_table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
-        
-        daily_layout.addWidget(QLabel("<b>Ganancias Diarias</b>"))
-        daily_layout.addWidget(self.daily_earnings_date)
-        daily_layout.addWidget(btn_load_daily)
-        daily_layout.addWidget(self.daily_earnings_table)
-        daily_tab.setLayout(daily_layout)
-        
-        # Añadir las subpestañas
-        earnings_tabs.addTab(monthly_tab, "Resumen Mensual")
-        earnings_tabs.addTab(daily_tab, "Detalle Diario")
-        
-        layout.addWidget(earnings_tabs)
-        tab.setLayout(layout)
-        return tab
+        self.resize(1400, 900)
+        self.setStyleSheet(GLOBAL_STYLE)
 
-    def create_trainers_tab(self):
-        tab = QWidget()
-        layout = QVBoxLayout()
-        
-        form_new = QFormLayout()
-        self.trainer_name = QLineEdit()
-        self.trainer_name.setStyleSheet(LARGE_LINEEDIT_STYLE)
-        self.trainer_lastname = QLineEdit()
-        self.trainer_lastname.setStyleSheet(LARGE_LINEEDIT_STYLE)
-        
-        form_new.addRow(QLabel("Nombre:"), self.trainer_name)
-        form_new.addRow(QLabel("Apellido:"), self.trainer_lastname)
-        
-        btn_add = QPushButton("Registrar Entrenador")
-        btn_add.setStyleSheet(LARGE_BUTTON_STYLE)
-        btn_add.clicked.connect(self.add_trainer)
-        
-        form_payment = QFormLayout()
-        self.trainer_combo = QComboBox()
-        self.trainer_combo.setStyleSheet(LARGE_LINEEDIT_STYLE)
-        self.load_trainers_combo()
-        
-        self.trainer_amount = QLineEdit()
-        self.trainer_amount.setStyleSheet(LARGE_LINEEDIT_STYLE)
-        
-        self.trainer_date = QDateEdit()
-        self.trainer_date.setDate(QDate.currentDate())
-        self.trainer_date.setCalendarPopup(True)
-        self.trainer_date.setStyleSheet(LARGE_LINEEDIT_STYLE)
-        
-        form_payment.addRow(QLabel("Entrenador:"), self.trainer_combo)
-        form_payment.addRow(QLabel("Monto:"), self.trainer_amount)
-        form_payment.addRow(QLabel("Fecha:"), self.trainer_date)
-        
-        btn_pay = QPushButton("Registrar Pago")
-        btn_pay.setStyleSheet(LARGE_BUTTON_STYLE)
-        btn_pay.clicked.connect(self.register_trainer_payment)
-        
-        self.trainer_total_label = QLabel("Total hoy: $0.00")
-        self.trainer_total_label.setStyleSheet("font-weight: bold; font-size: 16px;")
-        
-        self.trainers_table = QTableWidget()
-        self.trainers_table.setColumnCount(3)
-        self.trainers_table.setHorizontalHeaderLabels(["ID", "Nombre", "Apellido"])
-        self.trainers_table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
-        self.load_trainers()
-        
-        layout.addLayout(form_new)
-        layout.addWidget(btn_add)
-        layout.addLayout(form_payment)
-        layout.addWidget(btn_pay)
-        layout.addWidget(self.trainer_total_label)
-        layout.addWidget(self.trainers_table)
-        tab.setLayout(layout)
-        return tab
-    
-    def create_expenses_tab(self):
-        tab = QWidget()
-        layout = QVBoxLayout()
-        
-        form = QFormLayout()
-        self.expense_admin = QLineEdit("0")
-        self.expense_admin.setStyleSheet(LARGE_LINEEDIT_STYLE)
-        self.expense_cleaning = QLineEdit("0")
-        self.expense_cleaning.setStyleSheet(LARGE_LINEEDIT_STYLE)
-        self.expense_trainers = QLineEdit("0")
-        self.expense_trainers.setReadOnly(True)
-        self.expense_trainers.setStyleSheet(LARGE_LINEEDIT_STYLE)
-        self.update_trainers_total()
-        
-        form.addRow(QLabel("Administración:"), self.expense_admin)
-        form.addRow(QLabel("Aseo:"), self.expense_cleaning)
-        form.addRow(QLabel("Total Entrenadores:"), self.expense_trainers)
-        
-        btn_expense = QPushButton("Registrar Gastos Diarios")
-        btn_expense.setStyleSheet(LARGE_BUTTON_STYLE)
-        btn_expense.clicked.connect(self.register_expenses)
-        
-        self.monthly_table = QTableWidget()
-        self.monthly_table.setColumnCount(5)
-        self.monthly_table.setHorizontalHeaderLabels(["Mes", "Administración", "Aseo", "Entrenadores", "Total"])
-        self.monthly_table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
-        self.load_monthly_expenses()
-        
-        layout.addLayout(form)
-        layout.addWidget(btn_expense)
-        layout.addWidget(QLabel("<hr><b>Resumen Mensual de Gastos</b>"))
-        layout.addWidget(self.monthly_table)
-        tab.setLayout(layout)
-        return tab
-    
-    def create_daily_expenses_tab(self):
-        tab = QWidget()
-        layout = QVBoxLayout()
-        
-        date_layout = QHBoxLayout()
-        self.daily_expenses_date = QDateEdit()
-        self.daily_expenses_date.setDate(QDate.currentDate())
-        self.daily_expenses_date.setCalendarPopup(True)
-        self.daily_expenses_date.setStyleSheet(LARGE_LINEEDIT_STYLE)
-        
-        btn_load = QPushButton("Cargar Gastos del Día")
-        btn_load.setStyleSheet(LARGE_BUTTON_STYLE)
-        btn_load.clicked.connect(self.load_daily_expenses_details)
-        
-        date_layout.addWidget(QLabel("Fecha:"))
-        date_layout.addWidget(self.daily_expenses_date)
-        date_layout.addWidget(btn_load)
-        date_layout.addStretch()
-        
-        general_group = QGroupBox("Gastos Generales")
-        general_layout = QVBoxLayout()
-        
-        self.daily_general_table = QTableWidget()
-        self.daily_general_table.setColumnCount(4)
-        self.daily_general_table.setHorizontalHeaderLabels(["Hora", "Administración", "Aseo", "Total Entrenadores"])
-        self.daily_general_table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
-        
-        general_layout.addWidget(self.daily_general_table)
-        general_group.setLayout(general_layout)
-        
-        trainers_group = QGroupBox("Pagos a Entrenadores")
-        trainers_layout = QVBoxLayout()
-        
-        self.daily_trainers_table = QTableWidget()
-        self.daily_trainers_table.setColumnCount(4)
-        self.daily_trainers_table.setHorizontalHeaderLabels(["Hora", "Entrenador", "Monto", "Concepto"])
-        self.daily_trainers_table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
-        
-        trainers_layout.addWidget(self.daily_trainers_table)
-        trainers_group.setLayout(trainers_layout)
-        
-        self.daily_total_label = QLabel("Total del día: $0.00")
-        self.daily_total_label.setStyleSheet("font-size: 18px; font-weight: bold;")
-        
-        layout.addLayout(date_layout)
-        layout.addWidget(general_group)
-        layout.addWidget(trainers_group)
-        layout.addWidget(self.daily_total_label)
-        layout.addStretch()
-        
-        tab.setLayout(layout)
-        return tab
+        main_widget = QWidget()
+        main_layout = QHBoxLayout(main_widget)
+        main_layout.setContentsMargins(0, 0, 0, 0)
+        main_layout.setSpacing(0)
+        self.setCentralWidget(main_widget)
 
-    # Funciones para miembros
+        self.nav_menu = QListWidget()
+        self.nav_menu.setFixedWidth(220)
+        self.nav_menu.addItems(["Dashboard", "Miembros", "Asistencias", "Pagos", "Membresías", "Ganancias", "Entrenadores", "Gastos"])
+        
+        self.pages = QStackedWidget()
+        
+        # Instanciar TODAS las páginas
+        self.dashboard_page = DashboardPage(self)
+        self.members_page = MembersPage(self)
+        self.attendance_page = AttendancePage(self)
+        self.payments_page = PaymentsPage(self)
+        self.memberships_page = MembershipsPage(self)
+        self.earnings_page = EarningsPage(self)
+        self.trainers_page = TrainersPage(self)
+        self.expenses_page = ExpensesPage(self)
+        
+        # Añadir TODAS las páginas al StackedWidget
+        self.pages.addWidget(self.dashboard_page)
+        self.pages.addWidget(self.members_page)
+        self.pages.addWidget(self.attendance_page)
+        self.pages.addWidget(self.payments_page)
+        self.pages.addWidget(self.memberships_page)
+        self.pages.addWidget(self.earnings_page)
+        self.pages.addWidget(self.trainers_page)
+        self.pages.addWidget(self.expenses_page)
+
+        main_layout.addWidget(self.nav_menu)
+        main_layout.addWidget(self.pages)
+        
+        self.nav_menu.currentItemChanged.connect(self.change_page)
+        self.connect_signals()
+
+        self.nav_menu.setCurrentRow(0)
+        self.load_all_data()
+
+    def change_page(self, current_item):
+        row = self.nav_menu.row(current_item)
+        self.pages.setCurrentIndex(row)
+        
+        page_loaders = {
+            0: lambda: self.update_dashboard_data(show_message=False),
+            1: self.load_members,
+            2: self.load_members_for_attendance,
+            3: self.load_members_for_payments,
+            4: self.load_active_memberships,
+            5: self.load_earnings_data,
+            6: self.load_trainers_data,
+            7: self.load_expenses_data
+        }
+        if row in page_loaders:
+            page_loaders[row]()
+
+    def load_all_data(self):
+        for i in range(self.nav_menu.count()):
+            self.change_page(self.nav_menu.item(i))
+        self.nav_menu.setCurrentRow(0)
+        self.update_dashboard_data(show_message=False)
+
+    def connect_signals(self):
+        # Dashboard
+        self.dashboard_page.refresh_button.clicked.connect(self.update_dashboard_data)
+        # Miembros
+        self.members_page.btn_add.clicked.connect(self.add_member)
+        self.members_page.btn_edit.clicked.connect(self.edit_member)
+        self.members_page.btn_delete.clicked.connect(self.delete_member)
+        self.members_page.member_search.textChanged.connect(self.filter_members_table)
+        # Asistencias
+        self.attendance_page.search_attendance.textChanged.connect(self.filter_members_for_attendance)
+        self.attendance_page.btn_checkin.clicked.connect(self.register_checkin)
+        self.attendance_page.btn_checkout.clicked.connect(self.register_checkout)
+        self.attendance_page.btn_load_attendance.clicked.connect(self.load_attendance_records)
+        # Pagos
+        self.payments_page.payment_search.textChanged.connect(self.filter_members_for_payments)
+        self.payments_page.btn_daily.clicked.connect(lambda: self.register_payment(4000, "Pago Diario"))
+        self.payments_page.btn_monthly.clicked.connect(lambda: self.register_payment(55000, "Pago Mensual"))
+        # Membresías
+        self.memberships_page.btn_refresh.clicked.connect(self.load_active_memberships)
+        self.memberships_page.membership_search.textChanged.connect(self.filter_memberships)
+        # Ganancias
+        self.earnings_page.btn_load_daily.clicked.connect(self.load_daily_earnings)
+        # Entrenadores
+        self.trainers_page.btn_add_trainer.clicked.connect(self.add_trainer)
+        self.trainers_page.btn_pay_trainer.clicked.connect(self.register_trainer_payment)
+        # Gastos
+        self.expenses_page.btn_register_expenses.clicked.connect(self.register_expenses)
+        self.expenses_page.btn_load_daily_expenses.clicked.connect(self.load_daily_expenses_details)
+
+    # --- LÓGICA DE LA APLICACIÓN ---
+    
+    #region Dashboard
+    def update_dashboard_data(self, show_message=True):
+        try:
+            # 1. Obtener ganancias brutas
+            earnings_gross = self.db.get_todays_earnings_total()
+            
+            # 2. Obtener gastos totales del día
+            expenses_total = self.db.get_todays_expenses_total()
+            
+            # 3. Calcular la ganancia NETA
+            net_earnings = earnings_gross - expenses_total
+
+            # Obtener los otros datos del dashboard
+            present = self.db.get_members_present_today()
+            active = self.db.get_active_memberships_count()
+            expiring = self.db.get_expiring_memberships_count(days=7)
+
+            # 4. Actualizar la etiqueta con la ganancia NETA
+            self.dashboard_page.earnings_label.setText(f"${net_earnings:,.0f}")
+            
+            # Actualizar el resto de etiquetas
+            self.dashboard_page.present_label.setText(str(present))
+            self.dashboard_page.active_label.setText(str(active))
+            self.dashboard_page.expiring_label.setText(str(expiring))
+            
+            if show_message:
+                QMessageBox.information(self, "Actualizado", "Los datos del dashboard han sido actualizados.")
+        except Exception as e:
+            QMessageBox.critical(self, "Error", f"No se pudo actualizar el dashboard: {e}")
+    #endregion
+            
+    #region Members
     def load_members(self):
-        self.members_table.setRowCount(0)
+        table = self.members_page.members_table
+        table.setRowCount(0)
         members = self.db.buscar_miembros()
         for row, member in enumerate(members):
-            self.members_table.insertRow(row)
-            self.members_table.setItem(row, 0, QTableWidgetItem(str(member['id_miembro'])))
-            self.members_table.setItem(row, 1, QTableWidgetItem(member['nombre']))
-            self.members_table.setItem(row, 2, QTableWidgetItem(member['apellido'] or ""))
-            self.members_table.setItem(row, 3, QTableWidgetItem(member['sexo'] or ""))
-            self.members_table.setItem(row, 4, QTableWidgetItem(member['fecha_registro']))
+            table.insertRow(row)
+            table.setItem(row, 0, QTableWidgetItem(str(member['id_miembro'])))
+            table.setItem(row, 1, QTableWidgetItem(member['nombre']))
+            table.setItem(row, 2, QTableWidgetItem(member['apellido'] or ""))
+            table.setItem(row, 3, QTableWidgetItem(member['sexo'] or ""))
+            table.setItem(row, 4, QTableWidgetItem(member['fecha_registro']))
 
     def filter_members_table(self, text):
+        table = self.members_page.members_table
         if not text:
-            for row in range(self.members_table.rowCount()):
-                self.members_table.setRowHidden(row, False)
+            for r in range(table.rowCount()): table.setRowHidden(r, False)
             return
-        
-        members = self.db.buscar_miembro_por_nombre(text)
-        found_ids = {m['id_miembro'] for m in members}
-        
-        for row in range(self.members_table.rowCount()):
-            item = self.members_table.item(row, 0)
-            if item:
-                member_id = int(item.text())
-                self.members_table.setRowHidden(row, member_id not in found_ids)
-
-    def load_members_for_attendance(self):
-        self.attendance_list.clear()
-        members = self.db.buscar_miembros()
-        for member in members:
-            item_text = f"{member['nombre']} {member['apellido']}" if member['apellido'] else member['nombre']
-            item = QListWidgetItem(item_text)
-            item.setData(Qt.ItemDataRole.UserRole, member['id_miembro'])
-            self.attendance_list.addItem(item)
-
-    def filter_members_for_attendance(self, text):
-        if not text:
-            for i in range(self.attendance_list.count()):
-                self.attendance_list.item(i).setHidden(False)
-            return
-        
-        members = self.db.buscar_miembro_por_nombre(text)
-        found_ids = {m['id_miembro'] for m in members}
-        
-        for i in range(self.attendance_list.count()):
-            item = self.attendance_list.item(i)
-            item_id = item.data(Qt.ItemDataRole.UserRole)
-            item.setHidden(item_id not in found_ids)
-
-    def load_members_for_payments(self):
-        self.payment_member_list.clear()
-        members = self.db.buscar_miembros()
-        for member in members:
-            item_text = f"{member['nombre']} {member['apellido']}" if member['apellido'] else member['nombre']
-            item = QListWidgetItem(item_text)
-            item.setData(Qt.ItemDataRole.UserRole, member['id_miembro'])
-            self.payment_member_list.addItem(item)
-
-    def filter_members_for_payments(self, text):
-        if not text:
-            for i in range(self.payment_member_list.count()):
-                self.payment_member_list.item(i).setHidden(False)
-            return
-        
-        members = self.db.buscar_miembro_por_nombre(text)
-        found_ids = {m['id_miembro'] for m in members}
-        
-        for i in range(self.payment_member_list.count()):
-            item = self.payment_member_list.item(i)
-            item_id = item.data(Qt.ItemDataRole.UserRole)
-            item.setHidden(item_id not in found_ids)
+        found_ids = {m['id_miembro'] for m in self.db.buscar_miembro_por_nombre(text)}
+        for r in range(table.rowCount()):
+            table.setRowHidden(r, int(table.item(r, 0).text()) not in found_ids)
 
     def add_member(self):
-        nombre = self.member_name.text().strip()
+        nombre = self.members_page.member_name.text().strip()
         if not nombre:
-            QMessageBox.warning(self, "Error", "El nombre es obligatorio")
-            return
-        
+            QMessageBox.warning(self, "Error", "El nombre es obligatorio"); return
         try:
-            self.db.agregar_miembro(
-                nombre,
-                self.member_lastname.text() or None,
-                self.member_gender.currentText()
-            )
-            self.member_name.clear()
-            self.member_lastname.clear()
-            self.load_members()
-            self.load_members_for_attendance()
-            self.load_members_for_payments()
-            QMessageBox.information(self, "Éxito", "Miembro registrado")
-        except Exception as e:
-            QMessageBox.critical(self, "Error", f"No se pudo registrar el miembro: {str(e)}")
+            self.db.agregar_miembro(nombre, self.members_page.member_lastname.text() or None, self.members_page.member_gender.currentText())
+            self.members_page.member_name.clear(); self.members_page.member_lastname.clear()
+            self.load_all_data(); QMessageBox.information(self, "Éxito", "Miembro registrado")
+        except Exception as e: QMessageBox.critical(self, "Error", f"No se pudo registrar el miembro: {e}")
 
     def edit_member(self):
-        selected = self.members_table.currentRow()
-        if selected >= 0:
-            member_id = int(self.members_table.item(selected, 0).text())
-            member = self.db.obtener_miembro_por_id(member_id)
-            
-            dialog = QDialog(self)
-            dialog.setWindowTitle("Editar Miembro")
-            layout = QFormLayout(dialog)
-            
-            nombre_edit = QLineEdit(member['nombre'])
-            apellido_edit = QLineEdit(member['apellido'] or "")
-            sexo_combo = QComboBox()
-            sexo_combo.addItems(["Masculino", "Femenino"])
-            if member['sexo']:
-                sexo_combo.setCurrentText(member['sexo'])
-            
-            layout.addRow("Nombre:", nombre_edit)
-            layout.addRow("Apellido:", apellido_edit)
-            layout.addRow("Sexo:", sexo_combo)
-            
-            btn_box = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel)
-            btn_box.accepted.connect(dialog.accept)
-            btn_box.rejected.connect(dialog.reject)
-            layout.addRow(btn_box)
-            
-            if dialog.exec() == QDialog.DialogCode.Accepted:
-                if self.db.actualizar_miembro(
-                    member_id,
-                    nombre_edit.text().strip(),
-                    apellido_edit.text().strip() or None,
-                    sexo_combo.currentText()
-                ):
-                    self.load_members()
-                    self.load_members_for_attendance()
-                    self.load_members_for_payments()
-                    QMessageBox.information(self, "Éxito", "Miembro actualizado")
+        table = self.members_page.members_table
+        selected = table.currentRow()
+        if selected < 0: QMessageBox.warning(self, "Atención", "Seleccione un miembro para editar."); return
+        member_id = int(table.item(selected, 0).text())
+        member = self.db.obtener_miembro_por_id(member_id)
+        dialog = QDialog(self); dialog.setWindowTitle("Editar Miembro")
+        layout = QFormLayout(dialog)
+        nombre_edit = QLineEdit(member['nombre']); apellido_edit = QLineEdit(member['apellido'] or "")
+        sexo_combo = QComboBox(); sexo_combo.addItems(["Masculino", "Femenino"]); sexo_combo.setCurrentText(member['sexo'] or "Masculino")
+        layout.addRow("Nombre:", nombre_edit); layout.addRow("Apellido:", apellido_edit); layout.addRow("Sexo:", sexo_combo)
+        btn_box = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel)
+        btn_box.accepted.connect(dialog.accept); btn_box.rejected.connect(dialog.reject); layout.addRow(btn_box)
+        if dialog.exec() == QDialog.DialogCode.Accepted:
+            if self.db.actualizar_miembro(member_id, nombre_edit.text().strip(), apellido_edit.text().strip() or None, sexo_combo.currentText()):
+                self.load_all_data(); QMessageBox.information(self, "Éxito", "Miembro actualizado.")
 
     def delete_member(self):
-        selected = self.members_table.currentRow()
-        if selected >= 0:
-            member_id = int(self.members_table.item(selected, 0).text())
-            reply = QMessageBox.question(
-                self, 'Confirmar',
-                '¿Estás seguro de eliminar este miembro?',
-                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
-            )
-            if reply == QMessageBox.StandardButton.Yes:
-                if self.db.eliminar_miembro(member_id):
-                    self.load_members()
-                    self.load_members_for_attendance()
-                    self.load_members_for_payments()
-                    QMessageBox.information(self, "Éxito", "Miembro eliminado")
-                else:
-                    QMessageBox.warning(self, "Error", "No se pudo eliminar el miembro")
+        table = self.members_page.members_table
+        selected = table.currentRow()
+        if selected < 0: QMessageBox.warning(self, "Atención", "Seleccione un miembro para eliminar."); return
+        member_id = int(table.item(selected, 0).text())
+        reply = QMessageBox.question(self, 'Confirmar', '¿Estás seguro de eliminar este miembro?', QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No, QMessageBox.StandardButton.No)
+        if reply == QMessageBox.StandardButton.Yes:
+            if self.db.eliminar_miembro(member_id): self.load_all_data(); QMessageBox.information(self, "Éxito", "Miembro eliminado.")
+            else: QMessageBox.warning(self, "Error", "No se pudo eliminar el miembro.")
+    #endregion
 
-    # Funciones para asistencias
+    #region Attendance
+    def load_members_for_attendance(self):
+        table = self.attendance_page.attendance_table_reg
+        table.setRowCount(0)
+        members = sorted(self.db.buscar_miembros(), key=lambda x: (x['nombre'].lower(), x['apellido'].lower() if x['apellido'] else ""))
+        for row, member in enumerate(members):
+            table.insertRow(row)
+            id_item = QTableWidgetItem(str(member['id_miembro'])); id_item.setData(Qt.ItemDataRole.UserRole, member['id_miembro'])
+            table.setItem(row, 0, id_item); table.setItem(row, 1, QTableWidgetItem(member['nombre'])); table.setItem(row, 2, QTableWidgetItem(member['apellido'] or ""))
+
+    def filter_members_for_attendance(self, text):
+        table = self.attendance_page.attendance_table_reg; text = text.lower()
+        for r in range(table.rowCount()):
+            nombre = table.item(r, 1).text().lower(); apellido = table.item(r, 2).text().lower()
+            table.setRowHidden(r, text not in nombre and text not in apellido)
+
     def register_checkin(self):
-        current_item = self.attendance_list.currentItem()
-        if current_item:
-            member_id = current_item.data(Qt.ItemDataRole.UserRole)
-            try:
-                self.db.registrar_entrada(member_id)
-                QMessageBox.information(self, "Éxito", "Entrada registrada")
-            except Exception as e:
-                QMessageBox.critical(self, "Error", f"No se pudo registrar la entrada: {str(e)}")
+        table = self.attendance_page.attendance_table_reg
+        current_row = table.currentRow()
+        if current_row < 0: QMessageBox.warning(self, "Advertencia", "Seleccione un miembro primero"); return
+        member_id = table.item(current_row, 0).data(Qt.ItemDataRole.UserRole)
+        member_name = table.item(current_row, 1).text()
+        try:
+            if self.db.registrar_entrada(member_id):
+                QMessageBox.information(self, "Éxito", f"Entrada registrada para: {member_name}")
+                self.update_dashboard_data(show_message=False)
+            else: QMessageBox.warning(self, "Error", "No se pudo registrar la entrada. ¿Ya hay una entrada registrada hoy?")
+        except Exception as e: QMessageBox.critical(self, "Error", f"No se pudo registrar la entrada: {e}")
 
     def register_checkout(self):
-        current_item = self.attendance_list.currentItem()
-        if current_item:
-            member_id = current_item.data(Qt.ItemDataRole.UserRole)
-            try:
-                self.db.registrar_salida(member_id)
-                QMessageBox.information(self, "Éxito", "Salida registrada")
-            except Exception as e:
-                QMessageBox.critical(self, "Error", f"No se pudo registrar la salida: {str(e)}")
-
-    # Funciones para pagos
-    def register_payment(self):
+        table = self.attendance_page.attendance_table_reg
+        current_row = table.currentRow()
+        if current_row < 0: QMessageBox.warning(self, "Advertencia", "Seleccione un miembro primero"); return
+        member_id = table.item(current_row, 0).data(Qt.ItemDataRole.UserRole)
         try:
-            current_item = self.payment_member_list.currentItem()
-            if not current_item:
-                raise ValueError("Seleccione un miembro")
-                
-            member_id = current_item.data(Qt.ItemDataRole.UserRole)
-            amount_str = self.payment_amount.text().replace(",", "").strip()
-            if not amount_str:
-                raise ValueError("Ingrese un monto")
-                
-            amount = float(amount_str)
-            if amount <= 0:
-                raise ValueError("El monto debe ser positivo")
+            if self.db.registrar_salida(member_id):
+                QMessageBox.information(self, "Éxito", f"Salida registrada para: {table.item(current_row, 1).text()}")
+            else: QMessageBox.warning(self, "Error", "No se encontró entrada para registrar salida o ya tiene salida registrada.")
+        except Exception as e: QMessageBox.critical(self, "Error", f"No se pudo registrar la salida: {e}")
 
-            if not self.db.registrar_pago(member_id, amount):
-                raise Exception("No se pudo registrar el pago en la base de datos")
-            
-            self.payment_amount.clear()
-            self.load_monthly_earnings()  # Actualizar la tabla de ganancias mensuales
-            self.load_daily_earnings()    # Actualizar la tabla de ganancias diarias
-            
-            QMessageBox.information(
-                self,
-                "Pago Registrado",
-                f"Pago registrado correctamente:\n\n"
-                f"Miembro: {current_item.text()}\n"
-                f"Monto: ${amount:,.2f}\n"
-            )
-            
-        except ValueError as e:
-            QMessageBox.warning(self, "Error", f"Dato inválido: {str(e)}")
-        except Exception as e:
-            QMessageBox.critical(self, "Error", f"No se pudo registrar el pago: {str(e)}")
+    def load_attendance_records(self):
+        table = self.attendance_page.attendance_table_view
+        try:
+            fecha = self.attendance_page.attendance_view_date.date().toString("yyyy-MM-dd")
+            records = self.db.conn.cursor().execute("""
+                SELECT m.id_miembro, m.nombre, m.apellido, a.hora_entrada, a.hora_salida FROM Asistencias a
+                JOIN Miembros m ON a.id_miembro = m.id_miembro WHERE date(a.fecha) = ? AND a.hora_entrada IS NOT NULL ORDER BY a.hora_entrada
+            """, (fecha,)).fetchall()
+            table.setRowCount(len(records))
+            for row, record in enumerate(records):
+                table.setItem(row, 0, QTableWidgetItem(str(record['id_miembro'])))
+                table.setItem(row, 1, QTableWidgetItem(record['nombre']))
+                table.setItem(row, 2, QTableWidgetItem(record['apellido'] or ""))
+                h_in = record['hora_entrada'] or ""; h_out = record['hora_salida'] or ""
+                table.setItem(row, 3, QTableWidgetItem(h_in)); table.setItem(row, 4, QTableWidgetItem(h_out))
+                total_t = ""
+                if h_in and h_out:
+                    try:
+                        diff = datetime.strptime(h_out, "%H:%M:%S") - datetime.strptime(h_in, "%H:%M:%S")
+                        total_t = f"{diff.seconds // 3600}h {(diff.seconds % 3600) // 60}m"
+                    except ValueError: total_t = "Error"
+                table.setItem(row, 5, QTableWidgetItem(total_t))
+        except Exception as e: QMessageBox.warning(self, "Error", f"No se pudieron cargar las asistencias: {e}"); table.setRowCount(0)
+    #endregion
+    
+    #region Payments
+    def load_members_for_payments(self):
+        table = self.payments_page.payment_member_table
+        table.setRowCount(0)
+        members = sorted(self.db.buscar_miembros(), key=lambda x: (x['nombre'].lower(), x['apellido'].lower() if x['apellido'] else ""))
+        for row, member in enumerate(members):
+            table.insertRow(row)
+            id_item = QTableWidgetItem(str(member['id_miembro'])); id_item.setData(Qt.ItemDataRole.UserRole, member['id_miembro'])
+            table.setItem(row, 0, id_item); table.setItem(row, 1, QTableWidgetItem(member['nombre'])); table.setItem(row, 2, QTableWidgetItem(member['apellido'] or ""))
 
-    def load_monthly_payments(self):
+    def filter_members_for_payments(self, text):
+        table = self.payments_page.payment_member_table; text = text.lower()
+        for r in range(table.rowCount()):
+            nombre = table.item(r, 1).text().lower(); apellido = table.item(r, 2).text().lower()
+            table.setRowHidden(r, text not in nombre and text not in apellido)
+
+    def register_payment(self, amount, payment_type):
+        table = self.payments_page.payment_member_table
+        current_row = table.currentRow()
+        if current_row < 0: QMessageBox.warning(self, "Error", "Seleccione un miembro"); return
+        member_id = table.item(current_row, 0).data(Qt.ItemDataRole.UserRole)
+        fecha_pago = self.payments_page.payment_date.date().toString("yyyy-MM-dd")
+        try:
+            if not self.db.registrar_pago(member_id, amount, fecha_pago): raise Exception("Fallo en la base de datos")
+            QMessageBox.information(self, "Pago Registrado", f"{payment_type} de ${amount:,.0f} registrado.")
+            self.load_all_data()
+        except Exception as e: QMessageBox.critical(self, "Error", f"No se pudo registrar el pago: {e}")
+    #endregion
+    
+    #region Memberships
+    def load_active_memberships(self):
+        table = self.memberships_page.memberships_table
+        try:
+            table.setRowCount(0)
+            membresias = self.db.obtener_membresias_activas()
+            if membresias is None: return
+            today = datetime.now().date()
+            validas = []
+            for m in membresias:
+                try:
+                    fecha_fin = datetime.strptime(m['fecha_fin'], "%Y-%m-%d").date()
+                    dias = (fecha_fin - today).days
+                    if dias >= 0: validas.append((m, dias))
+                except (ValueError, TypeError): continue
+            table.setRowCount(len(validas))
+            for row, (miembro, dias_restantes) in enumerate(validas):
+                table.setItem(row, 0, QTableWidgetItem(str(miembro['id_miembro'])))
+                table.setItem(row, 1, QTableWidgetItem(miembro['nombre']))
+                table.setItem(row, 2, QTableWidgetItem(miembro['apellido'] or ""))
+                fecha_pago = miembro['fecha_pago'].split()[0] if ' ' in miembro['fecha_pago'] else miembro['fecha_pago']
+                table.setItem(row, 3, QTableWidgetItem(fecha_pago))
+                table.setItem(row, 4, QTableWidgetItem(miembro['fecha_fin']))
+                dias_item = QTableWidgetItem(str(dias_restantes))
+                if dias_restantes <= 1: dias_item.setBackground(QColor(255, 200, 200)) # Rojo
+                elif dias_restantes <= 5: dias_item.setBackground(QColor(255, 255, 150)) # Amarillo
+                table.setItem(row, 5, dias_item)
+        except Exception as e: QMessageBox.critical(self, "Error", f"Error al cargar membresías: {e}")
+
+    def filter_memberships(self, text):
+        table = self.memberships_page.memberships_table; text = text.lower()
+        for r in range(table.rowCount()):
+            nombre = table.item(r, 1).text().lower(); apellido = table.item(r, 2).text().lower()
+            table.setRowHidden(r, text not in nombre and text not in apellido)
+    #endregion
+
+    #region Earnings
+    def load_earnings_data(self):
+        self.load_monthly_earnings()
+        self.load_daily_earnings()
+
+    def load_monthly_earnings(self):
+        table = self.earnings_page.monthly_earnings_table
         try:
             ganancias = self.db.obtener_ganancias_mensuales()
-            self.monthly_payments_table.setRowCount(len(ganancias))
-            
-            for row, ganancia in enumerate(ganancias):
-                self.monthly_payments_table.setItem(row, 0, QTableWidgetItem(ganancia['mes']))
-                self.monthly_payments_table.setItem(row, 1, QTableWidgetItem(f"${ganancia['total']:,.2f}"))
-        except Exception as e:
-            QMessageBox.warning(self, "Error", f"No se pudieron cargar las ganancias mensuales: {str(e)}")
+            gastos = {g['mes']: g['gasto_total'] for g in self.db.obtener_gastos_por_mes()}
+            table.setRowCount(len(ganancias))
+            for row, g in enumerate(ganancias):
+                gasto_mes = gastos.get(g['mes'], 0.0)
+                neta = g['total'] - gasto_mes
+                table.setItem(row, 0, QTableWidgetItem(g['mes']))
+                table.setItem(row, 1, QTableWidgetItem(f"${g['total']:,.2f}"))
+                table.setItem(row, 2, QTableWidgetItem(f"${gasto_mes:,.2f}"))
+                table.setItem(row, 3, QTableWidgetItem(f"${neta:,.2f}"))
+                table.setItem(row, 4, QTableWidgetItem(str(g['cantidad_pagos'])))
+        except Exception as e: QMessageBox.warning(self, "Error", f"No se pudieron cargar las ganancias mensuales: {e}")
 
-    def load_daily_payments(self):
+    def load_daily_earnings(self):
+        table = self.earnings_page.daily_earnings_table
         try:
-            fecha = self.daily_payments_date.date().toString("yyyy-MM-dd")
-            pagos = self.db.obtener_ganancias_diarias(fecha)
-            self.daily_payments_table.setRowCount(len(pagos))
-            
-            for row, pago in enumerate(pagos):
-                hora = pago['fecha_pago'].split()[1][:5] if ' ' in pago['fecha_pago'] else ''
-                self.daily_payments_table.setItem(row, 0, QTableWidgetItem(hora))
-                self.daily_payments_table.setItem(row, 1, QTableWidgetItem(f"{pago['nombre']} {pago['apellido']}"))
-                self.daily_payments_table.setItem(row, 2, QTableWidgetItem(f"${pago['monto']:,.2f}"))
-                
-        except Exception as e:
-            QMessageBox.warning(self, "Error", f"No se pudieron cargar los pagos diarios: {str(e)}")
+            fecha = self.earnings_page.daily_earnings_date.date().toString("yyyy-MM-dd")
+            ganancias = self.db.obtener_ganancias_diarias(fecha)
+            gastos_dia = self.db.obtener_detalle_gastos_diarios(fecha)
+            table.setRowCount(len(ganancias))
+            total_g = sum(g['monto'] for g in ganancias)
+            total_e = sum(g['gasto_admin'] + g['gasto_aseo'] + g['total_entrenadores'] for g in gastos_dia.get('gastos_generales',[]))
+            for row, g in enumerate(ganancias):
+                hora = g['fecha_pago'].split()[1][:5] if ' ' in g['fecha_pago'] else '00:00'
+                table.setItem(row, 0, QTableWidgetItem(hora))
+                table.setItem(row, 1, QTableWidgetItem(f"{g['nombre']} {g['apellido']}"))
+                table.setItem(row, 2, QTableWidgetItem(f"${g['monto']:,.2f}"))
+            self.earnings_page.daily_net_total.setText(f"Total Neto: ${total_g - total_e:,.2f}")
+        except Exception as e: QMessageBox.critical(self, "Error", f"No se pudieron cargar las ganancias diarias: {e}"); self.earnings_page.daily_net_total.setText("Total Neto: $0.00")
+    #endregion
+    
+    #region Trainers
+    def load_trainers_data(self):
+        self.load_trainers()
+        self.load_trainers_combo()
 
-    # Funciones para entrenadores
     def load_trainers_combo(self):
-        self.trainer_combo.clear()
-        trainers = self.db.obtener_entrenadores()
-        for trainer in trainers:
-            self.trainer_combo.addItem(
-                f"{trainer['nombre']} {trainer['apellido']}",
-                userData=trainer['id_entrenador']
-            )
+        combo = self.trainers_page.trainer_combo; combo.clear()
+        for t in self.db.obtener_entrenadores():
+            combo.addItem(f"{t['nombre']} {t['apellido']}", userData=t['id_entrenador'])
 
     def load_trainers(self):
-        trainers = self.db.obtener_entrenadores()
-        self.trainers_table.setRowCount(len(trainers))
-        
-        for row, trainer in enumerate(trainers):
-            self.trainers_table.setItem(row, 0, QTableWidgetItem(str(trainer['id_entrenador'])))
-            self.trainers_table.setItem(row, 1, QTableWidgetItem(trainer['nombre']))
-            self.trainers_table.setItem(row, 2, QTableWidgetItem(trainer['apellido'] or ""))
+        table = self.trainers_page.trainers_table
+        trainers = self.db.obtener_entrenadores(); table.setRowCount(len(trainers))
+        for row, t in enumerate(trainers):
+            table.setItem(row, 0, QTableWidgetItem(str(t['id_entrenador'])))
+            table.setItem(row, 1, QTableWidgetItem(t['nombre'])); table.setItem(row, 2, QTableWidgetItem(t['apellido'] or ""))
 
     def add_trainer(self):
-        nombre = self.trainer_name.text().strip()
-        if not nombre:
-            QMessageBox.warning(self, "Error", "El nombre es obligatorio")
-            return
-        
+        nombre = self.trainers_page.trainer_name.text().strip()
+        if not nombre: QMessageBox.warning(self, "Error", "El nombre es obligatorio"); return
         try:
-            self.db.agregar_entrenador(
-                nombre,
-                self.trainer_lastname.text() or None
-            )
-            self.trainer_name.clear()
-            self.trainer_lastname.clear()
-            self.load_trainers()
-            self.load_trainers_combo()
-            QMessageBox.information(self, "Éxito", "Entrenador registrado")
-        except Exception as e:
-            QMessageBox.critical(self, "Error", f"No se pudo registrar el entrenador: {str(e)}")
+            self.db.agregar_entrenador(nombre, self.trainers_page.trainer_lastname.text() or None)
+            self.trainers_page.trainer_name.clear(); self.trainers_page.trainer_lastname.clear()
+            self.load_trainers_data(); QMessageBox.information(self, "Éxito", "Entrenador registrado")
+        except Exception as e: QMessageBox.critical(self, "Error", f"No se pudo registrar el entrenador: {e}")
 
     def register_trainer_payment(self):
         try:
-            if not self.trainer_combo.currentData():
-                raise ValueError("Seleccione un entrenador")
-                
-            amount_str = self.trainer_amount.text().replace(",", "").strip()
-            if not amount_str:
-                raise ValueError("Ingrese un monto")
-                
-            amount = float(amount_str)
-            if amount <= 0:
-                raise ValueError("El monto debe ser positivo")
+            trainer_id = self.trainers_page.trainer_combo.currentData()
+            amount_str = self.trainers_page.trainer_amount.text().replace(",", "").strip()
+            if not trainer_id: raise ValueError("Seleccione un entrenador")
+            if not amount_str: raise ValueError("Ingrese un monto")
+            amount = float(amount_str); 
+            if amount <= 0: raise ValueError("El monto debe ser positivo")
+            
+            if self.db.registrar_pago_entrenador(trainer_id, amount) is None: raise Exception("No se pudo registrar")
+            
+            self.trainers_page.trainer_amount.clear()
+            self.load_expenses_data() # Actualizar total en la otra pestaña
+            QMessageBox.information(self, "Pago Registrado", f"Pago de ${amount:,.2f} a {self.trainers_page.trainer_combo.currentText()} registrado.")
+        except ValueError as e: QMessageBox.warning(self, "Error", f"Dato inválido: {e}")
+        except Exception as e: QMessageBox.critical(self, "Error", f"No se pudo registrar el pago: {e}")
+    #endregion
+    
+    #region Expenses
+    def load_expenses_data(self):
+        self.update_trainers_total_in_expenses()
+        self.load_monthly_expenses()
+        self.load_daily_expenses_details()
 
-            trainer_id = self.trainer_combo.currentData()
-            trainer_name = self.trainer_combo.currentText()
-            
-            if not self.db.registrar_pago_entrenador(trainer_id, amount):
-                raise Exception("No se pudo registrar el pago en la base de datos")
-            
-            self.trainer_amount.clear()
-            self.update_trainers_total()
-            
-            QMessageBox.information(
-                self,
-                "Pago Registrado",
-                f"Pago registrado correctamente:\n\n"
-                f"Entrenador: {trainer_name}\n"
-                f"Monto: ${amount:,.2f}\n"
-                f"Total acumulado hoy: {self.expense_trainers.text()}"
-            )
-            
-        except ValueError as e:
-            QMessageBox.warning(self, "Error", f"Dato inválido: {str(e)}")
-        except Exception as e:
-            QMessageBox.critical(self, "Error", f"No se pudo registrar el pago: {str(e)}")
+    def update_trainers_total_in_expenses(self):
+        try: self.expenses_page.expense_trainers.setText(f"{self.db.obtener_total_pagos_entrenadores():,.2f}")
+        except: self.expenses_page.expense_trainers.setText("0.00")
 
-    def update_trainers_total(self):
-        try:
-            total = self.db.obtener_total_pagos_entrenadores()
-            self.expense_trainers.setText(f"{total:,.2f}")
-            
-            if hasattr(self, 'trainer_total_label'):
-                self.trainer_total_label.setText(f"Total hoy: ${total:,.2f}")
-        except Exception as e:
-            print(f"Error actualizando total: {e}")
-
-    # Funciones para gastos
     def load_monthly_expenses(self):
+        table = self.expenses_page.monthly_expenses_table
         try:
-            gastos = self.db.obtener_gastos_por_mes()
-            self.monthly_table.setRowCount(len(gastos))
-            
-            for row, gasto in enumerate(gastos):
-                self.monthly_table.setItem(row, 0, QTableWidgetItem(gasto['mes']))
-                self.monthly_table.setItem(row, 1, QTableWidgetItem(f"${gasto['total_admin']:,.2f}"))
-                self.monthly_table.setItem(row, 2, QTableWidgetItem(f"${gasto['total_aseo']:,.2f}"))
-                self.monthly_table.setItem(row, 3, QTableWidgetItem(f"${gasto['total_entrenadores']:,.2f}"))
-                self.monthly_table.setItem(row, 4, QTableWidgetItem(f"${gasto['gasto_total']:,.2f}"))
-        except Exception as e:
-            QMessageBox.warning(self, "Error", f"No se pudieron cargar los gastos mensuales: {str(e)}")
-
-    def load_daily_expenses_details(self):
-        try:
-            fecha = self.daily_expenses_date.date().toString("yyyy-MM-dd")
-            detalles = self.db.obtener_detalle_gastos_diarios(fecha)
-            
-            if not detalles:
-                QMessageBox.information(self, "Información", "No hay datos para esta fecha")
-                return
-            
-            # Gastos generales
-            self.daily_general_table.setRowCount(len(detalles['gastos_generales']))
-            total_general = 0.0
-            
-            for row, gasto in enumerate(detalles['gastos_generales']):
-                hora = gasto['fecha'].split()[1][:5] if ' ' in gasto['fecha'] else ''
-                self.daily_general_table.setItem(row, 0, QTableWidgetItem(hora))
-                self.daily_general_table.setItem(row, 1, QTableWidgetItem(f"${gasto['gasto_admin']:,.2f}"))
-                self.daily_general_table.setItem(row, 2, QTableWidgetItem(f"${gasto['gasto_aseo']:,.2f}"))
-                self.daily_general_table.setItem(row, 3, QTableWidgetItem(f"${gasto['total_entrenadores']:,.2f}"))
-                
-                total_general += (gasto['gasto_admin'] + gasto['gasto_aseo'] + gasto['total_entrenadores'])
-            
-            # Pagos a entrenadores
-            self.daily_trainers_table.setRowCount(len(detalles['pagos_entrenadores']))
-            total_entrenadores = 0.0
-            
-            for row, pago in enumerate(detalles['pagos_entrenadores']):
-                hora = pago['fecha_pago'].split()[1][:5] if ' ' in pago['fecha_pago'] else ''
-                self.daily_trainers_table.setItem(row, 0, QTableWidgetItem(hora))
-                self.daily_trainers_table.setItem(row, 1, QTableWidgetItem(f"{pago['nombre']} {pago['apellido']}"))
-                self.daily_trainers_table.setItem(row, 2, QTableWidgetItem(f"${pago['monto']:,.2f}"))
-                self.daily_trainers_table.setItem(row, 3, QTableWidgetItem("Pago diario"))
-                
-                total_entrenadores += pago['monto']
-            
-            # Actualizar total
-            self.daily_total_label.setText(f"Total del día: ${total_general:,.2f}")
-            
-        except Exception as e:
-            QMessageBox.warning(self, "Error", f"No se pudieron cargar los detalles: {str(e)}")
+            gastos = self.db.obtener_gastos_por_mes(); table.setRowCount(len(gastos))
+            for row, g in enumerate(gastos):
+                table.setItem(row, 0, QTableWidgetItem(g['mes']))
+                table.setItem(row, 1, QTableWidgetItem(f"${g['total_admin']:,.2f}"))
+                table.setItem(row, 2, QTableWidgetItem(f"${g['total_aseo']:,.2f}"))
+                table.setItem(row, 3, QTableWidgetItem(f"${g['total_entrenadores']:,.2f}"))
+                table.setItem(row, 4, QTableWidgetItem(f"${g['gasto_total']:,.2f}"))
+        except Exception as e: QMessageBox.warning(self, "Error", f"No se pudieron cargar los gastos mensuales: {e}")
 
     def register_expenses(self):
         try:
-            admin_str = self.expense_admin.text().replace(",", "").strip()
-            aseo_str = self.expense_cleaning.text().replace(",", "").strip()
+            admin = float((self.expenses_page.expense_admin.text().replace(",", "").strip()) or "0")
+            aseo = float((self.expenses_page.expense_cleaning.text().replace(",", "").strip()) or "0")
+            if admin < 0 or aseo < 0: raise ValueError("Los montos no pueden ser negativos")
+            if not self.db.registrar_gastos(admin, aseo): raise Exception("Verifique si ya existen gastos registrados para hoy.")
             
-            if not admin_str or not aseo_str:
-                raise ValueError("Complete todos los campos")
-                
-            admin = float(admin_str)
-            aseo = float(aseo_str)
-            
-            if admin < 0 or aseo < 0:
-                raise ValueError("Los montos no pueden ser negativos")
+            self.load_all_data()
+            QMessageBox.information(self, "Gastos Registrados", "Gastos del día registrados correctamente.")
+        except ValueError as e: QMessageBox.warning(self, "Error", f"Dato inválido: {e}")
+        except Exception as e: QMessageBox.critical(self, "Error", str(e))
 
-            if not self.db.registrar_gastos(admin, aseo):
-                raise Exception("No se pudo registrar los gastos")
-            
-            QMessageBox.information(
-                self, 
-                "Gastos Registrados", 
-                f"Gastos registrados correctamente:\n\n"
-                f"• Administración: ${admin:,.2f}\n"
-                f"• Aseo: ${aseo:,.2f}\n"
-                f"• Total Entrenadores: {self.expense_trainers.text()}"
-            )
-            
-            self.expense_admin.setText("0")
-            self.expense_cleaning.setText("0")
-            self.load_monthly_expenses()
-            self.load_daily_expenses_details()
-            
-        except ValueError as e:
-            QMessageBox.warning(self, "Error", f"Dato inválido: {str(e)}")
-        except Exception as e:
-            QMessageBox.critical(self, "Error", f"No se pudieron registrar los gastos: {str(e)}")
-
-    def load_monthly_earnings(self):
-        """Carga las ganancias mensuales en la tabla correspondiente"""
+    def load_daily_expenses_details(self):
+        fecha = self.expenses_page.daily_expenses_date.date().toString("yyyy-MM-dd")
+        g_table = self.expenses_page.daily_general_table
+        t_table = self.expenses_page.daily_trainers_table
+        g_table.setRowCount(0); t_table.setRowCount(0)
         try:
-            ganancias = self.db.obtener_ganancias_mensuales()
-            self.monthly_earnings_table.setRowCount(len(ganancias))
+            resumen = self.db.obtener_detalle_gastos_diarios(fecha)
+            if resumen is None: return
             
-            for row, ganancia in enumerate(ganancias):
-                self.monthly_earnings_table.setItem(row, 0, QTableWidgetItem(ganancia['mes']))
-                self.monthly_earnings_table.setItem(row, 1, QTableWidgetItem(f"${ganancia['total']:,.2f}"))
-                self.monthly_earnings_table.setItem(row, 2, QTableWidgetItem(str(ganancia['cantidad_pagos'])))
-        except Exception as e:
-            QMessageBox.warning(self, "Error", f"No se pudieron cargar las ganancias mensuales: {str(e)}")
+            gastos_g = resumen.get('gastos_generales', [])
+            g_table.setRowCount(len(gastos_g))
+            total_dia = 0
+            for row, g in enumerate(gastos_g):
+                g_table.insertRow(row)
+                g_table.setItem(row, 0, QTableWidgetItem(g['hora']))
+                g_table.setItem(row, 1, QTableWidgetItem(f"${g['gasto_admin']:,.2f}"))
+                g_table.setItem(row, 2, QTableWidgetItem(f"${g['gasto_aseo']:,.2f}"))
+                g_table.setItem(row, 3, QTableWidgetItem(f"${g['total_entrenadores']:,.2f}"))
+                total_dia += g['gasto_admin'] + g['gasto_aseo'] + g['total_entrenadores']
 
-    def load_daily_earnings(self):
-        """Carga las ganancias diarias con mejor manejo de errores"""
-        try:
-            fecha = self.daily_earnings_date.date().toString("yyyy-MM-dd")
-            ganancias = self.db.obtener_ganancias_diarias(fecha)
+            pagos_t = resumen.get('pagos_entrenadores', [])
+            t_table.setRowCount(len(pagos_t))
+            for row, p in enumerate(pagos_t):
+                t_table.insertRow(row)
+                t_table.setItem(row, 0, QTableWidgetItem(p['hora']))
+                t_table.setItem(row, 1, QTableWidgetItem(p['entrenador']))
+                t_table.setItem(row, 2, QTableWidgetItem(f"${p['monto']:,.2f}"))
+                t_table.setItem(row, 3, QTableWidgetItem(p['concepto']))
+                if not gastos_g: total_dia += p['monto'] # Sumar solo si no hay un gasto general que ya lo incluya
             
-            if not ganancias:
-                QMessageBox.information(self, "Información", 
-                                    f"No hay registros de pagos para la fecha {fecha}")
-                self.daily_earnings_table.setRowCount(0)
-                return
-                
-            self.daily_earnings_table.setRowCount(len(ganancias))
-            
-            for row, ganancia in enumerate(ganancias):
-                # Extraer hora (HH:MM) de la fecha completa
-                hora = ganancia['fecha_pago'].split()[1][:5] if ' ' in ganancia['fecha_pago'] else '00:00'
-                
-                self.daily_earnings_table.setItem(row, 0, QTableWidgetItem(hora))
-                self.daily_earnings_table.setItem(row, 1, QTableWidgetItem(
-                    f"{ganancia['nombre']} {ganancia['apellido']}"))
-                self.daily_earnings_table.setItem(row, 2, QTableWidgetItem(
-                    f"${ganancia['monto']:,.2f}"))
-                self.daily_earnings_table.setItem(row, 3, QTableWidgetItem("Mensualidad"))
-                
-        except Exception as e:
-            QMessageBox.critical(self, "Error", 
-                            f"No se pudieron cargar las ganancias diarias: {str(e)}")
-            print(f"Error detallado: {e}")
+            self.expenses_page.daily_expenses_total.setText(f"Total del Día: ${total_dia:,.2f}")
+        except Exception as e: QMessageBox.warning(self, "Error", f"Error inesperado al cargar gastos: {e}")
+    #endregion
 
-    def closeEvent(self, event):
-        if hasattr(self, 'db'):
-            del self.db
-        event.accept()
 
 def main():
-    app = QApplication([])
+    app = QApplication(sys.argv)
     app.setStyle('Fusion')
     window = GymApp()
     window.show()
-    app.exec()
+    sys.exit(app.exec())
 
 if __name__ == "__main__":
     main()
