@@ -103,10 +103,16 @@ class GymApp(QMainWindow):
             page_loaders[row]()
 
     def load_all_data(self):
-        for i in range(self.nav_menu.count()):
-            self.change_page(self.nav_menu.item(i))
-        self.nav_menu.setCurrentRow(0)
-        self.update_dashboard_data(show_message=False)
+        """Carga los datos para todas las páginas sin cambiar la vista."""
+        # Este método ahora solo se enfoca en cargar los datos en las tablas
+        # para que estén listas cuando el usuario navegue a ellas.
+        self.load_members()
+        self.load_members_for_attendance()
+        self.load_members_for_payments()
+        self.load_active_memberships()
+        self.load_earnings_data()
+        self.load_trainers_data()
+        self.load_expenses_data()
 
     def connect_signals(self):
         # Dashboard
