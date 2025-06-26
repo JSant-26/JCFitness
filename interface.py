@@ -100,10 +100,23 @@ class DashboardPage(QWidget):
         
         layout.addLayout(summary_layout)
 
+        # Botones en un layout horizontal
+        button_layout = QHBoxLayout()
+        
         # Botón de refrescar
         self.refresh_button = QPushButton("Actualizar Datos")
         self.refresh_button.setStyleSheet(LARGE_BUTTON_STYLE)
-        layout.addWidget(self.refresh_button, alignment=Qt.AlignmentFlag.AlignCenter)
+        button_layout.addWidget(self.refresh_button)
+        
+        # Botón de respaldo
+        self.backup_button = QPushButton("Respaldo")
+        self.backup_button.setStyleSheet(LARGE_BUTTON_STYLE)
+        button_layout.addWidget(self.backup_button)
+        
+        # Añadir el layout de botones al layout principal
+        layout.addLayout(button_layout)
+        
+        # Añadir espacio flexible al final
         layout.addStretch()
 
 # --- PÁGINA DE MIEMBROS ---
