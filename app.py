@@ -9,54 +9,8 @@ from PyQt6.QtWidgets import (
 )
 from PyQt6.QtCore import Qt, QDate
 from PyQt6.QtGui import QColor
-from PyQt6.QtWidgets import QProgressDialog
 from datetime import datetime
 from database import Database
-import smtplib
-from email.mime.multipart import MIMEMultipart
-from email.mime.base import MIMEBase
-from email.mime.text import MIMEText
-from email import encoders
-import os
-import tempfile
-import shutil
-
-class EmailBackup:
-    def __init__(self, db_path):
-        self.db_path = db_path
-        
-    def send_backup(self, to_email, smtp_user, smtp_password, smtp_server="smtp.gmail.com", smtp_port=587):
-        """Envía la base de datos como archivo adjunto por correo electrónico"""
-        try:
-            # Crear mensaje
-            msg = MIMEMultipart()
-            msg['From'] = smtp_user
-            msg['To'] = to_email
-            msg['Subject'] = "Respaldo Base de Datos JCFitness"
-            
-            # Cuerpo del mensaje
-            body = "Adjunto se encuentra el respaldo de la base de datos de JCFitness generado automáticamente."
-            msg.attach(MIMEText(body, 'plain'))
-            
-            # Adjuntar archivo
-            with open(self.db_path, 'rb') as attachment:
-                part = MIMEBase('application', 'octet-stream')
-                part.set_payload(attachment.read())
-                encoders.encode_base64(part)
-                part.add_header('Content-Disposition', f'attachment; filename= {os.path.basename(self.db_path)}')
-                msg.attach(part)
-            
-            # Enviar correo
-            with smtplib.SMTP(smtp_server, smtp_port) as server:
-                server.starttls()
-                server.login(smtp_user, smtp_password)
-                server.send_message(msg)
-            
-            return True
-        except Exception as e:
-            print(f"Error al enviar correo: {e}")
-            return False
-
 # Importamos TODAS las páginas de la UI
 from interface import (
     DashboardPage, MembersPage, AttendancePage, PaymentsPage,
@@ -86,7 +40,6 @@ class GymApp(QMainWindow):
     def __init__(self):
         super().__init__()
         self.db = Database()
-        self.email_backup = EmailBackup(self.db.db_path)
         self.setWindowTitle("JCFitness - Administración")
         self.resize(1400, 900)
         self.setStyleSheet(GLOBAL_STYLE)
@@ -164,7 +117,6 @@ class GymApp(QMainWindow):
     def connect_signals(self):
         # Dashboard
         self.dashboard_page.refresh_button.clicked.connect(self.update_dashboard_data)
-        self.email_backup = EmailBackup(self.db.db_path)
         # Miembros
         self.members_page.btn_add.clicked.connect(self.add_member)
         self.members_page.btn_edit.clicked.connect(self.edit_member)
@@ -222,72 +174,6 @@ class GymApp(QMainWindow):
                 QMessageBox.information(self, "Actualizado", "Los datos del dashboard han sido actualizados.")
         except Exception as e:
             QMessageBox.critical(self, "Error", f"No se pudo actualizar el dashboard: {e}")
-
-    def send_database_backup(self):
-        """Método para manejar el envío del respaldo"""
-        # Crear diálogo para ingresar credenciales
-        dialog = QDialog(self)
-        dialog.setWindowTitle("Configuración de Respaldo")
-        layout = QFormLayout(dialog)
-        
-        # Campos del formulario
-        email_edit = QLineEdit()
-        email_edit.setPlaceholderText("tu@email.com")
-        password_edit = QLineEdit()
-        password_edit.setEchoMode(QLineEdit.EchoMode.Password)
-        destination_edit = QLineEdit()
-        destination_edit.setPlaceholderText("destino@email.com")
-        
-        # Botones
-        btn_box = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel)
-        btn_box.accepted.connect(dialog.accept)
-        btn_box.rejected.connect(dialog.reject)
-        
-        # Añadir widgets al layout
-        layout.addRow("Tu correo (Gmail):", email_edit)
-        layout.addRow("Contraseña (App Password):", password_edit)
-        layout.addRow("Enviar a:", destination_edit)
-        layout.addRow(btn_box)
-        
-        if dialog.exec() == QDialog.DialogCode.Accepted:
-            # Obtener valores
-            smtp_user = email_edit.text().strip()
-            smtp_pass = password_edit.text().strip()
-            to_email = destination_edit.text().strip()
-            
-            if not all([smtp_user, smtp_pass, to_email]):
-                QMessageBox.warning(self, "Error", "Todos los campos son obligatorios")
-                return
-                
-            # Mostrar progreso
-            progress = QProgressDialog("Enviando respaldo...", "Cancelar", 0, 0, self)
-            progress.setWindowTitle("Enviando correo")
-            progress.setWindowModality(Qt.WindowModality.WindowModal)
-            progress.setCancelButton(None)  # No permitir cancelar
-            progress.show()
-            
-            # Forzar actualización de la UI
-            QApplication.processEvents()
-            
-            try:
-                # Intentar enviar el correo
-                success = self.email_backup.send_backup(
-                    to_email=to_email,
-                    smtp_user=smtp_user,
-                    smtp_password=smtp_pass
-                )
-                
-                progress.close()
-                
-                if success:
-                    QMessageBox.information(self, "Éxito", "Respaldo enviado correctamente")
-                else:
-                    QMessageBox.critical(self, "Error", "No se pudo enviar el respaldo. Verifica tus credenciales y conexión.")
-                    
-            except Exception as e:
-                progress.close()
-                QMessageBox.critical(self, "Error", f"Error al enviar el respaldo: {str(e)}")
-
     #endregion
             
     #region Members
