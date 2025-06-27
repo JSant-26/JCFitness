@@ -4,7 +4,28 @@ from datetime import datetime
 
 class Database:
     def __init__(self):
-        self.db_path = os.path.join(os.path.dirname(__file__), 'jcfitness.db')
+        # 1. Definir el nombre del archivo de la base de datos.
+        db_filename = 'jcfitness.db'
+
+        # 2. Determinar la ruta persistente para los datos del usuario.
+        #    Esto crea una carpeta "JCFitness" en AppData\Roaming
+        #    (una ubicación estándar para datos de aplicaciones en Windows).
+        #    En Linux/macOS, usará ~/.config/JCFitness
+        try:
+            # Para Windows, esto será algo como C:\Users\TuUsuario\AppData\Roaming
+            # Para Linux, será /home/tu-usuario/.config
+            app_data_path = os.path.join(os.environ['APPDATA'], 'JCFitness')
+        except KeyError:
+            # Para Linux, macOS y otros sistemas
+            app_data_path = os.path.join(os.path.expanduser('~'), '.config', 'JCFitness')
+
+        # 3. Asegurarse de que el directorio exista.
+        os.makedirs(app_data_path, exist_ok=True)
+
+        # 4. Establecer la ruta final y persistente de la base de datos.
+        self.db_path = os.path.join(app_data_path, db_filename)
+
+        # --- El resto del método no cambia ---
         self.conn = None
         self.connect()
         self.create_tables()
