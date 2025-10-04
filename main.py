@@ -1,17 +1,18 @@
 import sys
 from PyQt6.QtWidgets import QApplication
-from app import GymApp
-from database import Database
+# Importamos la ventana principal desde su nuevo archivo
+from app.main_window import GymApp 
 
 def main():
-    # Configurar aplicación
+    """Punto de entrada principal de la aplicación."""
     app = QApplication(sys.argv)
+    app.setStyle('Fusion')
     
-    # Inicializar y mostrar ventana principal
+    # Creamos una instancia de nuestra aplicación
     window = GymApp()
     window.show()
     
-    # Ejecutar aplicación
+    # Ejecutamos el bucle de eventos de la aplicación
     sys.exit(app.exec())
 
 if __name__ == "__main__":
